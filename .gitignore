@@ -1,0 +1,21 @@
+# Environment
+.env
+.env.*
+venv/
+__pycache__/
+*.pyc
+
+# Data (not committed — too large)
+data/
+*.csv
+*.json
+*.jsonl
+*.jsonl.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
