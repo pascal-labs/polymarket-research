@@ -70,11 +70,20 @@ The analysis scripts expect:
 
 These data files are not included in the repo (too large, and continuously regenerated from live capture).
 
+## Documentation
+
+| Area | Document | Highlights |
+|------|----------|------------|
+| Market Maker Analysis | [FINDINGS.md](market-maker-analysis/docs/FINDINGS.md) | Ladder reconstruction, aggression triggers, pair accumulation dynamics |
+| Literature | [LITERATURE_REVIEW.md](literature/LITERATURE_REVIEW.md) | 10 topic areas: Hawkes processes, Kelly criterion, HMM regime detection, ensemble methods |
+| Microstructure | [ORDERBOOK_DYNAMICS.md](microstructure/ORDERBOOK_DYNAMICS.md) | Spread dynamics, OFI, microprice, resolution behavior, cross-exchange signals |
+| Ecosystem | [ECOSYSTEM_OVERVIEW.md](ecosystem/ECOSYSTEM_OVERVIEW.md) | $76B market, platform landscape, 7 institutional strategies |
+
 ## Related Projects
 
-- [polymarket-sdk](https://github.com/pascal-labs/polymarket-sdk) — Python SDK for Polymarket API interaction
-- [pulsefeed](https://github.com/pascal-labs/pulsefeed) — Multi-exchange crypto price aggregation
-- [event-probability-models](https://github.com/pascal-labs/event-probability-models) — Ensemble probability models for prediction markets
+- [polymarket-sdk](https://github.com/pascal-labs/polymarket-sdk) — Python SDK for Polymarket API (data collection infrastructure)
+- [pulsefeed](https://github.com/pascal-labs/pulsefeed) — Multi-exchange price feeds (cross-exchange signal source)
+- [event-probability-models](https://github.com/pascal-labs/event-probability-models) — Ensemble models informed by this research
 
 ## License
 
