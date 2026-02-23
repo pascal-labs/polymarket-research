@@ -179,7 +179,7 @@ This suggests a **reactive ladder** — the structure is mostly static, but the 
 
 ### What This Research Reveals
 
-1. **The edge is in the pair spread**: Successful market making on Polymarket's binary markets comes from accumulating YES+NO pairs below $1.00, not from directional prediction. The 2-3 cent spread per pair is the structural edge.
+1. **The edge appears to be in the pair spread**: Based on our analysis, successful market making on Polymarket's binary markets comes from accumulating YES+NO pairs below $1.00, not from directional prediction. The observed 2-3 cent spread per pair is the structural edge for the wallets we studied.
 
 2. **Aggression is costly**: Every aggressive fill costs 1-3 cents of edge. Strategy design should minimize forced crossing — this means better inventory management and more patient accumulation.
 

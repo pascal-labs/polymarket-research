@@ -53,6 +53,10 @@ Survey of academic work on optimal market making in binary prediction markets, i
 
 Comprehensive mapping of the prediction market industry as of early 2026 — platforms, institutional participants, regulatory landscape, and the seven key strategies being deployed by professional trading firms.
 
+## From Research to Execution
+
+This research directly informed automated trading strategies deployed on Polymarket. The market maker analysis revealed where liquidity exists and how it behaves near resolution — critical for execution timing. The microstructure observations (pre-resolution dips, spread asymmetry, OFI predictive power) became features in the [event-probability-models](https://github.com/pascal-labs/event-probability-models) used for live trading. See the deployment results and backtest validation in that repo.
+
 ## Methodology
 
 All analysis uses publicly available on-chain data. Wallet activity on Polygon is transparent by design — the trades analyzed here are visible to anyone running a block explorer. The analytical value isn't in the data (it's public), it's in the framework for interpreting it.
