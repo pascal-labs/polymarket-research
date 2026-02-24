@@ -1,93 +1,162 @@
-# polymarket-research
+# Reverse-Engineering a Polymarket Market Maker
 
-Independent research into prediction market microstructure, market maker behavior, and the emerging institutional landscape. This repo documents my analytical methodology for studying how binary outcome markets actually work — from L2 orderbook dynamics to the strategies of the largest on-chain market makers.
+Forensic analysis of a professional market maker operating on Polymarket's rapid-resolution BTC binary markets — 44,562 trades, 3,700+ windows, $182K+ cumulative P&L reconstructed from public on-chain data.
 
-## Why This Exists
+---
 
-Prediction markets are undergoing a phase transition. Combined volume grew from ~$9B (2024) to $76B+ (2025), driven by institutional market makers (SIG, Jump, Jane Street, DRW) entering what was previously a retail-dominated space. Understanding the microstructure of these markets — how liquidity forms, how spreads behave around resolution, how professional market makers structure their ladders — is the foundation for any serious quantitative approach.
+## What Are Rapid-Resolution Binary Markets?
 
-This isn't a trading system. It's the research that informs one.
+Polymarket creates a new BTC Up/Down contract every 15 minutes: *"Will BTC be higher or lower than the opening price at market close?"*
 
-## Architecture
+- YES/NO shares settle at $1.00 or $0.00
+- New market every 15 minutes — 96 per day
+- $50K-200K volume per window
+- Professional market makers dominate liquidity provision
+
+I noticed that a small number of wallets were consistently providing liquidity across these markets and generating significant profits. I wanted to understand how.
+
+---
+
+## The Investigation
 
 ```
-polymarket-research/
-│
-├── market-maker-analysis/           # Reverse-engineering on-chain MM behavior
-│   ├── fingerprint_ladder.py        # L2 orderbook diff analysis
-│   ├── analyze_edge.py              # Edge quantification framework
-│   └── docs/
-│       └── FINDINGS.md              # Detailed write-up of discoveries
-│
-├── literature/
-│   └── LITERATURE_REVIEW.md         # Academic papers on binary market making
-│
-├── microstructure/
-│   └── ORDERBOOK_DYNAMICS.md        # Empirical observations on CLOB behavior
-│
-└── ecosystem/
-    └── ECOSYSTEM_OVERVIEW.md        # Industry map: platforms, players, strategies
+Public on-chain trade data (Polygon)
+    |
+    v
+Wallet identification (most active/profitable)
+    |
+    v
+44,562 trades fetched via Polymarket data API
+    |
+    v
+L2 orderbook snapshots (WebSocket capture, ~1/sec)
+    |
+    v
+L2 diff analysis (fingerprint fills as maker/taker)
+    |
+    v
+Strategy reconstruction
+    |-- Inventory trajectories per window
+    |-- Pair cost analysis (combined UP + DN average)
+    |-- Aggression trigger identification
+    |-- Endgame behavior near resolution
+    |
+    v
+22 analysis plots across 3,700+ windows
 ```
 
-## Research Areas
+Full methodology: [docs/METHODOLOGY.md](docs/METHODOLOGY.md)
 
-### 1. Market Maker Fingerprinting
+---
 
-Polymarket's on-chain transparency means every trade from every wallet is public. I used L2 orderbook diffs to reconstruct the ladder strategies of the most active market makers — analyzing fill sizes, level spacing, maker/taker ratios, and replenishment patterns. The methodology is applicable to any on-chain CLOB.
+## The Core Discovery
 
-**Key insight:** The dominant market makers use static ladder strategies with DCA-style accumulation, but their aggression triggers are state-dependent — they cross the spread when position imbalance exceeds specific thresholds late in the window.
+The edge is **not** directional prediction. It's execution quality.
 
-### 2. Orderbook Microstructure
+The market maker buys both YES and NO shares in each window, targeting a combined average cost below $1.00. Since one side always pays $1.00 at settlement, any pair purchased below $1.00 is a guaranteed profit.
 
-Empirical analysis of how Polymarket's CLOB behaves:
-- Spread dynamics across market types (BTC 15-min vs political vs sports)
-- Liquidity depth patterns by time of day and proximity to resolution
-- Queue replenishment rates after sweeps
-- The relationship between order flow imbalance and short-term price direction
+| Metric | Value |
+|--------|-------|
+| Median combined pair cost | $0.9888 |
+| Edge per matched pair | ~1.1 cents |
+| Win rate | 82% across 3,469 resolved windows |
+| Cumulative P&L | $182K+ |
+| Windows traded per day | ~75-90 (after selective skips) |
 
-### 3. Literature Review
+---
 
-Survey of academic work on optimal market making in binary prediction markets, including ladder strategies, pair accumulation under inventory constraints, and proper scoring rules for probability calibration.
+## Key Findings
 
-### 4. Ecosystem Analysis
+### Perfectly Balanced Inventory Accumulation
 
-Comprehensive mapping of the prediction market industry as of early 2026 — platforms, institutional participants, regulatory landscape, and the seven key strategies being deployed by professional trading firms.
+The market maker accumulates UP and DN shares in parallel, converging toward 50/50 balance. This isn't a directional bet — it's pair spread capture.
 
-## From Research to Execution
+![Inventory Trajectories](figures/01_inventory_trajectories.png)
 
-This research directly informed automated trading strategies deployed on Polymarket. The market maker analysis revealed where liquidity exists and how it behaves near resolution — critical for execution timing. The microstructure observations (pre-resolution dips, spread asymmetry, OFI predictive power) became features in the [event-probability-models](https://github.com/pascal-labs/event-probability-models) used for live trading. See the deployment results and backtest validation in that repo.
+### Combined Pair Cost Below Breakeven
 
-## Methodology
+The combined cost distribution is centered at $0.9888 — consistently below the $1.00 breakeven. The cumulative P&L curve is monotonically increasing.
 
-All analysis uses publicly available on-chain data. Wallet activity on Polygon is transparent by design — the trades analyzed here are visible to anyone running a block explorer. The analytical value isn't in the data (it's public), it's in the framework for interpreting it.
+![Pair Cost & P&L](figures/05_pair_cost_pnl.png)
 
-**What's included:** Analytical methodology, research findings, code for data processing.
+### Static Ladder, Dynamic Aggression
 
-**What's excluded:** My own trading parameters, wallet addresses, position sizes, and live strategy configuration.
+The MM posts resting orders at 5-10 levels per side with 1-2 cent spacing and ~8 shares per level. But when inventory becomes imbalanced, they cross the spread aggressively on the deficit side.
 
-## Data Requirements
+| Position Imbalance | Aggressive Fill % |
+|-------------------|------------------|
+| 0-5% | 12% |
+| 5-10% | 18% |
+| 10-15% | 27% |
+| 15-20% | 41% |
+| 20%+ | 63% |
 
-The analysis scripts expect:
-- L2 orderbook snapshots (JSONL.gz format from WebSocket capture)
-- Trade history (JSON, fetched via Polymarket Subgraph API)
-- Price log (CSV with timestamp, yes_price, no_price per market)
+![Ladder Reconstruction](figures/08_ladder_reconstruction.png)
 
-These data files are not included in the repo (too large, and continuously regenerated from live capture).
+### Endgame Urgency
+
+In the final 2 minutes of each 15-minute window, aggression spikes. 80% of spread-crossing happens in the last 60 seconds. The MM stops filling at ~13 minutes, concentrating final aggressive rebalancing in minutes 13-14.
+
+![Endgame Behavior](figures/22_endgame.png)
+
+Full findings with all 22 plot references: [docs/FINDINGS.md](docs/FINDINGS.md)
+
+---
+
+## Analysis Scripts
+
+| Script | Description |
+|--------|-------------|
+| [`scripts/fetch_trades.py`](scripts/fetch_trades.py) | Paginated trade fetching from Polymarket data API |
+| [`scripts/fingerprint_ladder.py`](scripts/fingerprint_ladder.py) | L2 orderbook diff analysis — classify fills as maker/taker |
+| [`scripts/analyze_edge.py`](scripts/analyze_edge.py) | Edge decomposition: execution, selection, timing, aggression |
+| [`scripts/reverse_engineer_strategy.py`](scripts/reverse_engineer_strategy.py) | Strategy reconstruction: position trajectories, combined cost, P&L |
+| [`scripts/visualize.py`](scripts/visualize.py) | 7-plot visualization suite (plots 01-07) |
+
+Scripts require trade data and price logs (not included — continuously generated from live capture pipeline).
+
+---
 
 ## Documentation
 
-| Area | Document | Highlights |
-|------|----------|------------|
-| Market Maker Analysis | [FINDINGS.md](market-maker-analysis/docs/FINDINGS.md) | Ladder reconstruction, aggression triggers, pair accumulation dynamics |
-| Literature | [LITERATURE_REVIEW.md](literature/LITERATURE_REVIEW.md) | 10 topic areas: Hawkes processes, Kelly criterion, HMM regime detection, ensemble methods |
-| Microstructure | [ORDERBOOK_DYNAMICS.md](microstructure/ORDERBOOK_DYNAMICS.md) | Spread dynamics, OFI, microprice, resolution behavior, cross-exchange signals |
-| Ecosystem | [ECOSYSTEM_OVERVIEW.md](ecosystem/ECOSYSTEM_OVERVIEW.md) | $76B market, platform landscape, 7 institutional strategies |
+| Document | Contents |
+|----------|----------|
+| [docs/FINDINGS.md](docs/FINDINGS.md) | All 6 discoveries organized by evidence, with references to 22 plots |
+| [docs/METHODOLOGY.md](docs/METHODOLOGY.md) | 4 fingerprinting techniques for identifying MMs from public data |
+| [docs/ORDERBOOK_DYNAMICS.md](docs/ORDERBOOK_DYNAMICS.md) | Empirical microstructure observations from L2 orderbook capture |
+
+---
+
+## What I Learned
+
+**Market making in binary markets is about inventory management, not prediction.** The 82% win rate doesn't come from knowing which way BTC will move — it comes from buying both sides at a combined cost below $1.00.
+
+**Execution quality compounds.** A 0.5-cent average edge per fill seems negligible, but across 44,562 trades it produces $182K. The strategy works because it's high-frequency and systematic, not because any single trade is large.
+
+**The aggression trigger is the key behavioral fingerprint.** The state-dependent switch from passive to aggressive fills — driven by inventory imbalance and time remaining — is the most revealing signal in the data. It connects directly to HJB optimal control theory on pair accumulation.
+
+**Selection discipline is a source of edge.** The MM skips ~15% of windows, with skip rates correlated with adverse conditions (extreme opening prices, low-liquidity hours). Not trading is itself a decision that contributes to profitability.
+
+---
 
 ## Related Projects
 
-- [polymarket-sdk](https://github.com/pascal-labs/polymarket-sdk) — Python SDK for Polymarket API (data collection infrastructure)
-- [pulsefeed](https://github.com/pascal-labs/pulsefeed) — Multi-exchange price feeds (cross-exchange signal source)
-- [event-probability-models](https://github.com/pascal-labs/event-probability-models) — Ensemble models informed by this research
+| Project | Connection |
+|---------|-----------|
+| [polymarket-sdk](https://github.com/pascal-labs/polymarket-sdk) | Python SDK for the Polymarket CLOB API used in data collection |
+| [pulsefeed](https://github.com/pascal-labs/pulsefeed) | Multi-exchange WebSocket aggregation for cross-exchange price feeds |
+| [event-probability-models](https://github.com/pascal-labs/event-probability-models) | Ensemble probability models that apply the theoretical frameworks discovered here |
+
+---
+
+## Data Requirements
+
+All analysis uses publicly available data:
+- **Trade history**: Polymarket data API (on-chain trade attribution via Polygon)
+- **L2 orderbook**: Polymarket WebSocket API (full depth snapshots)
+- **Price log**: Continuous recording from price feeds (~1Hz)
+
+No proprietary data, private APIs, or trading model parameters are included.
 
 ## License
 
