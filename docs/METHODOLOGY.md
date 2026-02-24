@@ -16,7 +16,7 @@ GET https://data-api.polymarket.com/activity?user={WALLET}&type=TRADE&limit=500&
 
 **Challenge:** The API limits responses to 500 trades per request, and large wallets have 40,000+ trades.
 
-**Solution:** Paginated fetching with offset windowing. For wallets that exceed the API's offset limit (~10,000), I switch to timestamp-based windowing — fetching the earliest batch, noting the last timestamp, then requesting trades after that timestamp.
+**Solution:** Paginated fetching with offset windowing. For wallets that exceed the API's offset limit (~10,000), I switch to timestamp-based windowing. For large wallets, backward timestamp pagination using the `end=` API parameter is more reliable than offset-based pagination. The API returns trades in reverse chronological order, so `end=<min_timestamp>` fetches the next page going backwards — fetching the most recent batch, noting the earliest timestamp, then requesting trades before that timestamp.
 
 **Output:** Complete fill history in JSON — timestamp, price, size, side (BUY/SELL), outcome (Up/Down), market slug, USDC amount.
 
@@ -37,6 +37,41 @@ Each snapshot contains the full bid/ask depth at every price level — not just 
 A separate recorder captures YES/NO prices at ~1Hz for every active market. This creates a dense price timeline for computing execution quality (fill price vs. market mid at exact fill timestamp).
 
 **Format:** CSV with columns `timestamp, market_id, yes_price, no_price, spread`
+
+---
+
+## L2 Completeness Pipeline
+
+Not all captured L2 windows are suitable for analysis. Before matching trades to orderbook data,
+each L2 capture undergoes completeness filtering:
+
+### Criteria
+
+| Check | Threshold | Rationale |
+|-------|-----------|-----------|
+| Minimum duration | >= 850 seconds | 15-min window = 900s; 850s allows for slight startup delay |
+| Maximum snapshot gap | <= 5 seconds | Fills between snapshots can't be reliably classified |
+| Both sides present | UP and DN book data | Need both orderbooks for imbalance and spread calculations |
+| Minimum snapshots | >= 10 | Below this, statistical measures are unreliable |
+
+### Pipeline
+
+1. Load trades from wallet fill history
+2. Group trades by market window slug
+3. For each slug, check if L2 capture file exists (`{slug}.jsonl.gz`)
+4. Load L2 events, build book timeseries
+5. Apply completeness filter
+6. Output: matched trades (with complete L2) + rejection report
+
+### Rejection Statistics
+
+In a typical capture run, the breakdown is:
+- ~40% of windows have no L2 file (capture wasn't running)
+- ~30% are rejected for completeness (gaps, short duration, missing side data)
+- ~30% pass all filters and are used for analysis
+
+This aggressive filtering means we work with fewer windows but can make stronger claims
+about fill classification accuracy.
 
 ---
 
@@ -82,6 +117,8 @@ Example:
 **Tolerance:** 80% match between vanished quantity and fill size (accounts for partial fills and timing gaps between snapshots).
 
 **Key insight:** When the vanished-to-fill ratio is exactly 1.0, the market maker was the **sole order** at that price level. This happens in 55-65% of maker fills, meaning their ladder levels are carefully chosen to avoid overlap.
+
+**Note:** An alternative classification method uses the BBO (best bid/offer) at the time of fill: if a BUY fill executes at or above the best ask, it's a taker fill (lifted the offer). If it executes below the best ask, it's a maker fill (resting bid was hit). This method has higher coverage (~99.9% classification rate) than the vanished-quantity method, though it cannot distinguish between fills at the same price level.
 
 ### Technique 3: Price-Time Matching
 
@@ -131,6 +168,27 @@ Three structural features of Polymarket make this analysis possible:
 - **Multi-wallet operation:** A single entity may operate multiple wallets, making wallet-level analysis an incomplete picture.
 - **Survivorship bias:** This analysis covers active, profitable market makers. Wallets that lost money and stopped trading are not represented.
 - **Regime changes:** Market maker behavior may shift as competition evolves or as they update their algorithms.
+
+---
+
+## Data Quality
+
+### L2 Timing Resolution
+
+Book snapshots arrive at ~1 Hz. This creates a fundamental timing limitation:
+- Fills that occur between snapshots use the nearest snapshot for classification
+- Two fills in the same second may share the same "before" snapshot
+- Sub-second book dynamics (quote flickering, fill-then-replace) are invisible
+
+For the BBO classification method, this means ~0.1% of fills may be misclassified
+when the BBO changes between the snapshot and the fill timestamp.
+
+### Deduplication
+
+The Polymarket data API's backward pagination can return overlapping trades at page
+boundaries. Deduplication uses a composite key of (transaction_hash, condition_id,
+outcome_index, side, price, size, timestamp) to eliminate duplicates while preserving
+legitimate same-timestamp fills at different prices.
 
 ---
 
