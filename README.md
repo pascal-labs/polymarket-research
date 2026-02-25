@@ -65,8 +65,8 @@ The market maker buys both YES and NO shares in each window, targeting a combine
 | Edge per matched pair | ~0.9 cents |
 | Win rate | 57.3% across 157 resolved windows |
 | Total P&L (observation period) | $3,413 |
-| Maker fills | 61.5% |
-| Taker fills | 38.5% |
+| Maker fills | 65.0% |
+| Taker fills | 35.0% |
 | L2 classification rate | 99.9% |
 
 ---
@@ -87,7 +87,7 @@ The combined cost distribution is centered at $0.9911 -- consistently below the 
 
 ### L2-Backed Maker/Taker Classification
 
-Every fill is classified using actual L2 orderbook diffs rather than inference from price data. By comparing the best bid/offer immediately before and after each fill, we determine whether the fill consumed resting liquidity (taker) or was resting liquidity that got hit (maker). 61.5% of fills are maker, 38.5% taker -- confirming the MM's primary role as a passive liquidity provider that selectively crosses the spread to rebalance.
+Every fill is classified using actual L2 orderbook diffs rather than inference from price data. By comparing the best bid/offer immediately before and after each fill, we determine whether the fill consumed resting liquidity (taker) or was resting liquidity that got hit (maker). 65% of fills are maker, 35% taker -- confirming the MM's primary role as a passive liquidity provider that selectively crosses the spread to rebalance.
 
 ![Maker/Taker Classification](figures/07_maker_taker_classification.png)
 

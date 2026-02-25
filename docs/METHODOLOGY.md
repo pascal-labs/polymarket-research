@@ -173,6 +173,30 @@ Three structural features of Polymarket make this analysis possible:
 
 ## Data Quality
 
+### Block Timestamp Correction
+
+Trade timestamps from the Polymarket data API are **Polygon block timestamps**, not matching-engine execution times. Evidence:
+
+- Inter-trade gap analysis reveals **exclusively even-second gaps** (0, 2, 4, 6, 8...) with zero 1-second gaps
+- This is consistent with Polygon's ~2-second block time — trades are batched into blocks and stamped with the block timestamp
+- The L2 WebSocket data, by contrast, carries real-time matching-engine timestamps (sub-second precision)
+
+This creates a systematic 0-2 second delay (mean ~1s) when looking up the L2 BBO state at a trade's recorded timestamp. To correct for this, a **-1 second offset** is applied to all trade timestamps before BBO lookup — shifting the lookup back by half the average block time to align with the actual execution moment.
+
+**Sensitivity analysis:** Sweeping the correction from -3s to +3s:
+
+| Offset | Maker % | Taker % |
+|--------|---------|---------|
+| -3s | 77.8% | 22.2% |
+| -2s | 70.9% | 29.1% |
+| **-1s (applied)** | **65.0%** | **35.0%** |
+| 0s (uncorrected) | 61.5% | 38.5% |
+| +1s | 59.5% | 40.5% |
+| +2s | 58.0% | 42.0% |
+| +3s | 57.0% | 43.0% |
+
+The qualitative conclusion — majority-maker with state-dependent aggressive fills — is robust across all offsets. The -1s correction is the best point estimate: half the ~2s block time, maximizing L2 classification rate (99.9% of fills classified).
+
 ### L2 Timing Resolution
 
 Book snapshots arrive at ~1 Hz. This creates a fundamental timing limitation:

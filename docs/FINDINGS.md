@@ -53,7 +53,7 @@ The edge is **~0.9 cents per matched pair** on average. This is small per trade 
 
 **Plot 07 — Maker/Taker Classification** (`figures/07_maker_taker_classification.png`)
 - L2 BBO comparison classifies fills as maker (resting) or taker (aggressive)
-- **61.5% maker / 38.5% taker** — more passive than aggressive, but a substantial taker component
+- **65.0% maker / 35.0% taker** — more passive than aggressive, but a substantial taker component
 - Classification rate: **99.9%** of fills successfully classified using L2 book state
 
 **Plot 09 — Ladder Reconstruction** (`figures/09_ladder_reconstruction.png`)
@@ -79,7 +79,7 @@ The edge is **~0.9 cents per matched pair** on average. This is small per trade 
 
 ### Interpretation
 
-The aggression triggers reveal the MM's implicit cost function: they're willing to pay spread-crossing cost to close an imbalance, but only when passive accumulation becomes unlikely given remaining time. This is consistent with optimal control theory on pair accumulation. The 61.5/38.5 maker-taker split, confirmed by L2 BBO comparison, shows a strategy that leans passive but is not afraid to pay for urgency.
+The aggression triggers reveal the MM's implicit cost function: they're willing to pay spread-crossing cost to close an imbalance, but only when passive accumulation becomes unlikely given remaining time. This is consistent with optimal control theory on pair accumulation. The 65/35 maker-taker split, confirmed by L2 BBO comparison, shows a strategy that leans passive but is not afraid to pay for urgency.
 
 ---
 
@@ -132,7 +132,7 @@ The 15-minute window creates a natural deadline that forces resolution. The MM's
 
 ### Interpretation
 
-L2-backed classification eliminates the ambiguity that plagues trade-print-only analysis. When we say "61.5% maker," that number comes from comparing each fill price to the actual BBO at that moment — not from inferring aggressor side based on tick direction or trade size heuristics.
+L2-backed classification eliminates the ambiguity that plagues trade-print-only analysis. When we say "65% maker," that number comes from comparing each fill price to the actual BBO at the time of matching-engine execution — not from inferring aggressor side based on tick direction or trade size heuristics. A -1 second timestamp correction is applied to align on-chain block timestamps with the real-time L2 book state (see Methodology).
 
 ---
 
@@ -191,8 +191,8 @@ The economics are straightforward:
 | Median pair cost | $0.9911 |
 | Edge per pair | ~0.9 cents |
 | Win rate | 57.3% |
-| Maker fills | 61.5% |
-| Taker fills | 38.5% |
+| Maker fills | 65.0% |
+| Taker fills | 35.0% |
 | Classification rate | 99.9% |
 | Median final imbalance | 2.5% |
 | Cumulative P&L | $3,413 |
@@ -238,6 +238,7 @@ The ~0.9-cent per-pair edge multiplied across windows is the business model. It 
 - **Smaller dataset:** 157 windows is fewer than a trade-print-only analysis could produce. But every window has full L2 orderbook coverage, making each claim directly verifiable rather than inferred.
 - **Survivorship bias:** Only analyzing a successful MM. Wallets that lost money and stopped are not in the dataset.
 - **L2 timing resolution:** ~1 second snapshots miss sub-second dynamics. Some fill timing may be imprecise at the millisecond level, though 99.9% classification rate suggests this is not a significant issue.
+- **Block timestamp alignment:** Trade timestamps from the data API are Polygon block timestamps (integer seconds, ~2s block time), which lag matching-engine execution by 0-2 seconds. A -1 second correction is applied as the best point estimate. Sensitivity analysis across offsets from -3s to +3s shows maker% ranging from 57.0% to 77.8%, with the applied -1s correction yielding 65.0%. The qualitative findings (majority-maker with state-dependent aggression) are stable across all offsets.
 - **Multi-wallet operation:** A single entity may operate multiple wallets, making this an incomplete picture of their full activity.
 - **Regime changes:** The observed behavior reflects a specific competitive landscape that evolves over time.
 - **Public data only:** The MM's internal model parameters, risk limits, and fair value estimates remain unknown. We observe the behavioral surface of a deeper model.
