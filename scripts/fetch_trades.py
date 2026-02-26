@@ -9,6 +9,12 @@ Usage:
     export TARGET_WALLET="0x..."
     python fetch_trades.py
 """
+
+# Note: Trade data is fetched directly from Polymarket's REST API here
+# for research reproducibility. For production data capture, see
+# polymarket-sdk (github.com/pascal-labs/polymarket-sdk) which provides
+# WebSocket feeds, connection pooling, and HMAC authentication.
+
 import urllib.request
 import json
 import os
